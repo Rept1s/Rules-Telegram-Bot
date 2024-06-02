@@ -10,7 +10,7 @@ class AlbumHandler:
 
     async def check_album_and_send(self, message: Message):
         """
-        Проверяет, является ли альбомом, для того чтобы в дальнейшем не дублировать сообщение с просьбой подписаться.
+        Проверяет, является ли альбомом, для того чтобы в дальнейшем не дублировать сообщение с просьбой подписаться/принять правила.
         """
         if message.media_group_id:
             self.album_end_tracker[message.media_group_id].append(message.message_id)
@@ -28,47 +28,6 @@ class AlbumHandler:
             await message.delete()
             await answer_message(message)
 
-    async def check_album_and_subscribe(self, message: Message):
-        """
-            Проверяет, является ли альбомом, для того, чтобы в дальнейшем не дублировать сообщение с просьбой подписаться.
-        """
-        if message.media_group_id:
-            self.album_end_tracker[message.media_group_id].append(message.message_id)
-
-            async with self.album_locks[message.media_group_id]:
-                await asyncio.sleep(4)
-                if self.album_end_tracker[message.media_group_id][-1] == message.message_id:
-
-                    for msg_id in self.album_end_tracker[message.media_group_id]:
-                        await message.bot.delete_message(message.chat.id, msg_id)
-                    del self.album_end_tracker[message.media_group_id]
-                    del self.album_locks[message.media_group_id]
-                    await answer_message_sub(message)
-
-        else:
-            await message.delete()
-            await answer_message_sub(message)
-
-
-async def check_album_and_subscribe(message: Message):
-    """
-        Проверяет, является ли альбомом, для того, чтобы в дальнейшем не дублировать сообщение с просьбой подписаться.
-    """
-    if message.media_group_id:
-        if message.media_group_id not in album_end_tracker:
-            album_end_tracker[message.media_group_id] = message.message_id
-        else:
-            album_end_tracker[message.media_group_id] = max(album_end_tracker[message.media_group_id],
-                                                            message.message_id)
-
-        await asyncio.sleep(4)  # Ожидание, для получения всего альбома
-        if album_end_tracker[message.media_group_id] == message.message_id:
-            await answer_message_sub(message)
-            del album_end_tracker[message.media_group_id]
-    else:
-        await answer_message_sub(message)
-        return False
-
 
 async def first_name(message: Message):
     """
@@ -83,28 +42,29 @@ async def first_name(message: Message):
 
 async def answer_message(message: Message):
     """
-        Просьба перейти в бот и принять правила.
+        Просьба перейти в бот и принять правила/подписаться.
     """
-    send_answer = await message.answer(
-        '<a href="tg://user?id=' + str(message.from_user.id) + '">' + str(await first_name(message)) + '</a>' +
-        " необходимо принять пользовательское соглашение группы в боте @" + Env().str("BOT_USERNAME") + ". 📝",
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(
-            text="📖 Прочитать правила", url=Env().str("INVITE_LINK_BOT"))]]))
+    await message.bot.restrict_chat_member(message.chat.id, message.from_user.id, permissions=ChatPermissions(),
+                                           until_date=datetime.timedelta(minutes=1))
+    send_answer = await answer_message_check(message)
     await asyncio.sleep(180)  # 3 минут ожидания, далее очистка для удаления лишнего спама
     await send_answer.delete()
 
 
-async def answer_message_sub(message: Message):
-    """
-        Просьба перейти в бот и подписаться на каналы.
-    """
-    send_answer = await message.answer(
-        '<a href="tg://user?id=' + str(message.from_user.id) + '">' + str(await first_name(message)) + '</a>' +
-        " вам необходимо подписаться на все каналы проекта, чтобы писать в группе. 📝",
+async def answer_message_check(message):
+    if await select_check_id(message.from_user.id):
+        return await message.answer(
+            '<a href="tg://user?id=' + str(message.from_user.id) + '">' + str(await first_user_name(message.from_user))
+            + '</a>' + ", вам необходимо подписаться на все каналы проекта, чтобы писать в группе. 📝",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(
+                text="♻️ Подписаться", url=Env().str("INVITE_LINK_BOT"))]]))
+    return await message.answer(
+        '<a href="tg://user?id=' + str(message.from_user.id) + '">' + str(
+            await first_user_name(message.from_user)) + '</a>' +
+        ", для доступа в группу необходимо принять пользовательское соглашение группы в боте @"
+        + Env().str("BOT_USERNAME") + ". 📝",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(
-            text="♻️ Подписаться", url=Env().str("INVITE_LINK_BOT"))]]))
-    await asyncio.sleep(180)  # 3 минут ожидания, далее очистка для удаления лишнего спама
-    await send_answer.delete()
+            text="📖 Прочитать соглашение", url=Env().str("INVITE_LINK_BOT"))]]))
 
 
 async def subscribe_direct_message(message: Message):
