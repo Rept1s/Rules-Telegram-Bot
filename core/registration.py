@@ -8,7 +8,7 @@ from core.filters import FilterChatType, FilterChatAdmin, FilterSenderAnonim, Fi
 async def register_reg(dp):
     dp.message.register(AlbumHandler().check_album_and_send, FilterNotUserReg(), FilterChatType(), FilterChatAdmin(),
                         FilterSenderAnonim())
-    dp.message.register(AlbumHandler().check_album_and_subscribe, FilterUserReg(), FilterSubChannel(), FilterChatType(),
+    dp.message.register(AlbumHandler().check_album_and_send, FilterUserReg(), FilterSubChannel(), FilterChatType(),
                         FilterChatAdmin(), FilterSenderAnonim())
     dp.message.register(subscribe_direct_message, FilterDirectType(), FilterSubChannel())
     dp.message.register(rules_step, FilterDirectType(), FilterNotUserReg())
