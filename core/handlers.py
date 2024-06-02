@@ -1,27 +1,53 @@
 import asyncio
 from environs import Env
 from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery
-album_end_tracker = {}
 
 
-async def check_album_and_send(message: Message):
-    """
-        Проверяет, является ли альбомом, для того, чтобы в дальнейшем не дублировать сообщение с просьбой подписаться.
-    """
-    if message.media_group_id:
-        if message.media_group_id not in album_end_tracker:
-            album_end_tracker[message.media_group_id] = message.message_id
+class AlbumHandler:
+    def __init__(self):
+        self.album_end_tracker = defaultdict(list)
+        self.album_locks = defaultdict(asyncio.Lock)
+
+    async def check_album_and_send(self, message: Message):
+        """
+        Проверяет, является ли альбомом, для того чтобы в дальнейшем не дублировать сообщение с просьбой подписаться.
+        """
+        if message.media_group_id:
+            self.album_end_tracker[message.media_group_id].append(message.message_id)
+
+            async with self.album_locks[message.media_group_id]:
+                await asyncio.sleep(4)
+                if self.album_end_tracker[message.media_group_id][-1] == message.message_id:
+
+                    for msg_id in self.album_end_tracker[message.media_group_id]:
+                        await message.bot.delete_message(message.chat.id, msg_id)
+                    del self.album_end_tracker[message.media_group_id]
+                    del self.album_locks[message.media_group_id]
+                    await answer_message(message)
         else:
-            album_end_tracker[message.media_group_id] = max(album_end_tracker[message.media_group_id],
-                                                            message.message_id)
-
-        await asyncio.sleep(4)  # Ожидание, для получения всего альбома
-        if album_end_tracker[message.media_group_id] == message.message_id:
+            await message.delete()
             await answer_message(message)
-            del album_end_tracker[message.media_group_id]
-    else:
-        await answer_message(message)
-        return False
+
+    async def check_album_and_subscribe(self, message: Message):
+        """
+            Проверяет, является ли альбомом, для того, чтобы в дальнейшем не дублировать сообщение с просьбой подписаться.
+        """
+        if message.media_group_id:
+            self.album_end_tracker[message.media_group_id].append(message.message_id)
+
+            async with self.album_locks[message.media_group_id]:
+                await asyncio.sleep(4)
+                if self.album_end_tracker[message.media_group_id][-1] == message.message_id:
+
+                    for msg_id in self.album_end_tracker[message.media_group_id]:
+                        await message.bot.delete_message(message.chat.id, msg_id)
+                    del self.album_end_tracker[message.media_group_id]
+                    del self.album_locks[message.media_group_id]
+                    await answer_message_sub(message)
+
+        else:
+            await message.delete()
+            await answer_message_sub(message)
 
 
 async def check_album_and_subscribe(message: Message):
