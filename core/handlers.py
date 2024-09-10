@@ -1,6 +1,7 @@
 import asyncio
 from environs import Env
 from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery
+from collections import defaultdict
 
 
 class AlbumHandler:
